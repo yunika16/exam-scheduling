@@ -1,38 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Exam Scheduling using DSATUR</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>Exam Scheduling — DSATUR (Graph Visualizer)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
 </head>
 <body>
+  <header>
+    <h1>Exam Scheduling — DSATUR Visualization</h1>
+    
 
-<h1>Exam Scheduling Optimization</h1>
+  <main class="grid">
+    <section class="panel" id="controls">
+      <h2>Inputs</h2>
 
-<div class="container">
+      <label class="label">Upload Enrollment CSV (student_id,course)</label>
+      <div class="row">
+        <input type="file" id="csvFile" accept=".csv" />
+        <button id="uploadBtn" class="btn">Upload & Auto-Fill</button>
+      </div>
+      <div id="uploadStatus" class="muted small"></div>
 
-  <!-- ✅ CSV Upload -->
-  <label>Upload Enrollment CSV (student_id,course)</label>
-  <input type="file" id="csvFile" accept=".csv">
-  <button onclick="uploadCSV()">Upload & Auto-Fill</button>
+      <hr/>
 
-  <hr/>
+      <label class="label">Exams</label>
+      <div id="examTags" class="tags" tabindex="0">
+        <input id="examInput" placeholder="Type exam name and press Enter or comma" />
+      </div>
 
-  <label>Exams (comma separated)</label>
-  <input id="exams" placeholder="Math, Physics, CS, English">
+      <label class="label" style="margin-top:12px;">Conflicts</label>
+      <div id="conflictEditor" class="conflict-editor">
+        <select id="conflictA"></select>
+        <select id="conflictB"></select>
+        <button id="addConflictBtn" class="btn small">Add Conflict</button>
+      </div>
+      <ul id="conflictList" class="list muted small"></ul>
 
-  <label>Conflicts (one per line: Exam1-Exam2)</label>
-  <textarea id="conflicts" rows="6"
-    placeholder="Math-Physics
-Physics-CS
-Math-English"></textarea>
+      <div class="row" style="margin-top:14px;">
+        <button id="drawGraphBtn" class="btn">Draw Graph</button>
+        <button id="animateBtn" class="btn primary">Animate DSATUR</button>
+        <button id="stopAnimBtn" class="btn" disabled>Stop</button>
+      </div>
 
-  <button onclick="schedule()">Generate Schedule</button>
+      <div style="margin-top:12px;">
+        <button id="scheduleBtn" class="btn">Generate Backend Schedule</button>
+        <div id="spinner" class="spinner hidden" aria-hidden="true"></div>
+      </div>
 
-  <h2>Result</h2>
-  <div id="output"></div>
-</div>
+     
+    </section>
 
-<script src="script.js"></script>
+    <section class="panel" id="visual">
+      <h2>Graph / Animation</h2>
+
+      <div id="cy" class="cytoscape-container"></div>
+
+      
+      <div id="scheduleContainer" class="schedule-container" style="margin-top:10px;">
+        <strong>Current Step:</strong> <span id="currentStep">idle</span>
+        <div id="scheduleText" class="schedule-text" style="margin-top:8px"></div>
+      </div>
+    </section>
+  </main>
+
+
+
+  <script src="script.js"></script>
 </body>
 </html>
