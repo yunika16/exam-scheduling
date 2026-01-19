@@ -1,13 +1,20 @@
-
-let exams = []; // array of exam names
-let conflicts = []; // array of [a,b]
+let exams = [];
+let conflicts = [];
 let cy = null;
 let animTimer = null;
 let animIndex = 0;
 let animSteps = [];
 const COLOR_PALETTE = [
-  "#4F46E5", "#10B981", "#EF476F", "#F59E0B", "#06B6D4", "#8B5CF6", "#F97316",
-  "#0891B2", "#A3E635", "#EC4899", "#0EA5A4", "#84CC16", "#7C3AED", "#FB7185"
+  "#4F46E5","#10B981","#EF476F","#F59E0B","#06B6D4","#8B5CF6","#F97316","#0891B2","#A3E635","#EC4899",
+  "#0EA5A4","#84CC16","#7C3AED","#FB7185","#2563EB","#D97706","#DC2626","#059669","#9333EA","#F43F5E",
+  "#3B82F6","#FBBF24","#22C55E","#C026D3","#E11D48","#14B8A6","#65A30D","#BE185D","#1D4ED8","#FACC15",
+  "#16A34A","#7E22CE","#9D174D","#0D9488","#4D7C0F","#DB2777","#1E40AF","#CA8A04","#15803D","#6D28D9",
+  "#9F1239","#0F766E","#3F6212","#E879F9","#312E81","#B45309","#166534","#C4B5FD","#881337","#115E59",
+  "#365314","#F0ABFC","#1E3A8A","#713F12","#14532D","#A78BFA","#F87171","#FCD34D","#34D399","#C084FC",
+  "#FDA4AF","#38BDF8","#FDE68A","#4ADE80","#D8B4FE","#FBCFE8","#60A5FA","#FEF3C7","#86EFAC","#E9D5FF",
+  "#F5D0FE","#93C5FD","#FFEDD5","#BBF7D0","#DDD6FE","#FCE7F3","#BFDBFE","#FED7AA","#A7F3D0","#E0E7FF",
+  "#F9A8D4","#C7D2FE","#FDBA74","#99F6E4","#E5E7EB","#F472B6","#818CF8","#F59E0B","#22D3EE","#D1D5DB",
+  "#E11D48","#6366F1","#B91C1C","#F97316","#0EA5E9","#9CA3AF","#BE123C","#4338CA","#DC2626","#EA580C"
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -51,7 +58,6 @@ function initElements() {
       if (exams.length === 0) return alert("Add exams first.");
       drawGraph();
     }
-    // compute steps
     const graph = buildGraphFromLocal();
     animSteps = dsaturSteps(graph);
     if (animSteps.length === 0) return alert("No steps to animate.");
@@ -63,9 +69,8 @@ function initElements() {
 
   $("stopAnimBtn").addEventListener("click", stopAnimation);
 
-  $("scheduleBtn").addEventListener("click", schedule); // backend schedule (keeps existing behavior)
-  $("downloadBtn").addEventListener("click", downloadScheduleCSV);
-  $("copyBtn").addEventListener("click", copyScheduleToClipboard);
+  // IMPORTANT: LOCAL DSATUR scheduling
+  $("scheduleBtn").addEventListener("click", scheduleLocal);
 }
 
 /* ---------- Exams (tags) ---------- */
@@ -153,42 +158,48 @@ function renderConflictList() {
   });
 }
 
-/* ---------- CSV Upload (backend if available) ---------- */
+/* ---------- CSV Upload (local parsing) ---------- */
 function uploadCSV() {
   const file = $("csvFile").files[0];
   if (!file) return alert("Select a CSV file first.");
   const status = $("uploadStatus");
   status.textContent = "Uploading...";
-  const form = new FormData();
-  form.append("file", file);
 
-  fetch("http://127.0.0.1:5000/upload_enrollments", {
-    method: "POST",
-    body: form
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === "success") {
-        if (Array.isArray(data.exams)) {
-          data.exams.forEach(e => addExam(e));
-        }
-        if (Array.isArray(data.conflicts)) {
-          data.conflicts.forEach(pair => {
-            if (Array.isArray(pair) && pair.length === 2) addConflict(pair[0], pair[1]);
-          });
-        }
-        status.textContent = `Uploaded. Filled ${(data.exams||[]).length} exams, ${(data.conflicts||[]).length} conflicts.`;
-      } else {
-        status.textContent = `Upload error: ${data.message || "unknown"}`;
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      status.textContent = "Upload error. Is backend running?";
-    })
-    .finally(() => {
-      setTimeout(()=>{ status.textContent = ""; }, 4000);
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result;
+    const lines = text.trim().split("\n");
+    const enrollments = [];
+
+    lines.forEach((line, idx) => {
+      if (idx === 0 && line.toLowerCase().includes("student")) return;
+      const parts = line.split(",");
+      if (parts.length < 2) return;
+      enrollments.push({ student: parts[0].trim(), course: parts[1].trim() });
     });
+
+    // build conflicts automatically
+    const studentMap = {};
+    enrollments.forEach(e => {
+      if (!studentMap[e.student]) studentMap[e.student] = [];
+      studentMap[e.student].push(e.course);
+    });
+
+    Object.values(studentMap).forEach(courses => {
+      for (let i=0; i<courses.length; i++) {
+        for (let j=i+1; j<courses.length; j++) {
+          addExam(courses[i]);
+          addExam(courses[j]);
+          addConflict(courses[i], courses[j]);
+        }
+      }
+    });
+
+    status.textContent = "Uploaded successfully.";
+    setTimeout(() => status.textContent = "", 3000);
+  };
+
+  reader.readAsText(file);
 }
 
 /* ---------- Build graph object from current exams/conflicts ---------- */
@@ -233,60 +244,54 @@ function drawGraph() {
     layout: { name: 'cose', idealEdgeLength: 80, nodeOverlap: 12 }
   });
 
-  // click node to pin details
-  cy.on('tap', 'node', evt => {
-    const n = evt.target;
-    const id = n.id();
-    const deg = cy.getElementById(id).degree();
-    const neighbors = n.neighborhood('node').map(x => x.id()).join(", ");
-    alert(`Exam: ${id}\nDegree: ${deg}\nNeighbors: ${neighbors}`);
-  });
-
   resetNodeStyles();
   updateScheduleText({});
 }
 
 /* ---------- DSATUR algorithm steps (JS): records steps for animation ---------- */
 function dsaturSteps(graph) {
-  // graph: {node: Set(neighbors)}
   const vertices = Object.keys(graph);
   const degrees = {};
   const color = {};
   const satColors = {};
   const uncolored = new Set(vertices);
-  vertices.forEach(v => { degrees[v] = graph[v].size; color[v] = 0; satColors[v] = new Set(); });
+
+  vertices.forEach(v => {
+    degrees[v] = graph[v].size;
+    color[v] = 0;
+    satColors[v] = new Set();
+  });
 
   const steps = [];
 
   while (uncolored.size > 0) {
-    // choose vertex: highest saturation (size satColors), then highest degree, then lexical
     const candidates = Array.from(uncolored);
     candidates.sort((a,b) => {
-      if (satColors[b].size !== satColors[a].size) return satColors[b].size - satColors[a].size;
-      if (degrees[b] !== degrees[a]) return degrees[b] - degrees[a];
+      if (satColors[b].size !== satColors[a].size)
+        return satColors[b].size - satColors[a].size;
+      if (degrees[b] !== degrees[a])
+        return degrees[b] - degrees[a];
       return a.localeCompare(b);
     });
-    const chosen = candidates[0];
 
-    // used colors among neighbors
+    const chosen = candidates[0];
     const used = new Set();
-    graph[chosen].forEach(n => { if (color[n] && color[n] > 0) used.add(color[n]); });
+    graph[chosen].forEach(n => {
+      if (color[n] > 0) used.add(color[n]);
+    });
 
     let c = 1;
     while (used.has(c)) c++;
     color[chosen] = c;
 
-    // record snapshot BEFORE updating neighbors' saturation for clearer animation:
     const snapshot = {
       chosen,
       colorAssigned: c,
-      colorMap: Object.assign({}, color), // shallow copy
-      satSnapshot: Object.fromEntries(Object.keys(satColors).map(k => [k, Array.from(satColors[k])]))
+      colorMap: Object.assign({}, color)
     };
     steps.push(snapshot);
 
     uncolored.delete(chosen);
-    // update neighbors sat sets
     graph[chosen].forEach(n => {
       if (uncolored.has(n)) satColors[n].add(c);
     });
@@ -295,87 +300,63 @@ function dsaturSteps(graph) {
   return steps;
 }
 
-/* ---------- Animation control ---------- */
+/* ---------- Animation ---------- */
 async function runAnimation(steps, delay = 800) {
-  // reset first
   resetNodeStyles();
   updateScheduleText({});
+
   for (let i = 0; i < steps.length; i++) {
-    animIndex = i;
     const s = steps[i];
-    // highlight chosen
     highlightChosenNode(s.chosen);
     updateCurrentStepText(i+1, steps.length, s);
-    // wait a bit then assign color
     await sleep(delay * 0.45);
     assignColorToNode(s.chosen, s.colorAssigned);
     updateScheduleText(s.colorMap);
     await sleep(delay * 0.55);
-    if (!cy) break;
-    if ($("stopAnimBtn").disabled === false && $("animateBtn").disabled === true && animIndex === i && animTimer === "stopRequested") { break; }
   }
-  // finished
+
   $("animateBtn").disabled = false;
   $("stopAnimBtn").disabled = true;
-  animTimer = null;
   updateCurrentStepText("finished", steps.length, null);
 }
 
 function stopAnimation() {
-  // simple approach: disable animate button and mark stop; actual loop checks a flag
   animTimer = "stopRequested";
   $("animateBtn").disabled = false;
   $("stopAnimBtn").disabled = true;
-  resetHighlights();
 }
 
-/* ---------- Node styling helpers ---------- */
+/* ---------- Node styling ---------- */
 function resetNodeStyles() {
   if (!cy) return;
   cy.nodes().forEach(n => {
     n.style({ 'background-color': '#c7d2fe', 'border-width': 0, 'border-color': '' });
     n.removeClass('chosen');
   });
-  cy.edges().style({ 'line-color': '#e2e8f0' });
 }
 
 function highlightChosenNode(id) {
   if (!cy) return;
   resetNodeStyles();
   const node = cy.getElementById(id);
-  if (node && node.nonempty()) {
-    node.addClass('chosen');
-    // pulse effect
-    node.animate({ style: { 'border-width': 6 } }, { duration: 250 });
-  }
+  node.addClass('chosen');
 }
 
 function assignColorToNode(id, colorNum) {
   if (!cy) return;
   const node = cy.getElementById(id);
-  if (node && node.nonempty()) {
-    const col = colorFor(colorNum);
-    node.style({ 'background-color': col, 'color': '#fff' });
-    node.data('slot', `Slot-${colorNum}`);
-  }
+  const col = colorFor(colorNum);
+  node.style({ 'background-color': col, 'color': '#fff' });
+  node.data('slot', `Slot-${colorNum}`);
 }
 
-function resetHighlights() {
-  if (!cy) return;
-  cy.nodes().forEach(n => n.removeClass('chosen'));
-  animIndex = 0;
-  animSteps = [];
-  updateCurrentStepText('stopped', 0, null);
-}
-
-/* ---------- Schedule text update ---------- */
+/* ---------- Schedule output ---------- */
 function updateScheduleText(colorMap) {
-  // colorMap might be partial or full mapping exam -> color number (0/undefined for uncolored)
   const mapping = {};
   if (colorMap && typeof colorMap === 'object') {
     Object.keys(colorMap).forEach(k => {
       const c = colorMap[k];
-      if (c && c > 0) mapping[k] = `Slot-${c}`;
+      if (c > 0) mapping[k] = `Slot-${c}`;
     });
   } else if (cy) {
     cy.nodes().forEach(n => {
@@ -383,6 +364,7 @@ function updateScheduleText(colorMap) {
       if (slot) mapping[n.id()] = slot;
     });
   }
+
   const keys = Object.keys(mapping).sort((a,b)=>a.localeCompare(b));
   let text = "";
   keys.forEach(k=> text += `${k} → ${mapping[k]}\n`);
@@ -391,83 +373,26 @@ function updateScheduleText(colorMap) {
 
 function updateCurrentStepText(step, total, stepObj) {
   if (step === "finished") $("currentStep").textContent = `finished`;
-  else if (step === "stopped") $("currentStep").textContent = `stopped`;
   else $("currentStep").textContent = `Step ${step} / ${total}` + (stepObj ? ` — ${stepObj.chosen} → Slot-${stepObj.colorAssigned}` : '');
 }
 
-/* ---------- Utilities ---------- */
 function colorFor(n) {
   return COLOR_PALETTE[(n - 1) % COLOR_PALETTE.length] || '#444';
 }
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-/* ---------- Backend scheduling (keeps existing behavior) ---------- */
-function schedule() {
+/* ---------- LOCAL DSATUR scheduling ---------- */
+function scheduleLocal() {
   if (exams.length === 0) return alert("Add at least one exam.");
-  const payload = {
-    exams,
-    conflicts: conflicts
-  };
 
-  $("scheduleBtn").disabled = true;
-  $("spinner").classList.remove("hidden");
+  const graph = buildGraphFromLocal();
+  const steps = dsaturSteps(graph);
+  const final = steps[steps.length - 1]?.colorMap || {};
+  updateScheduleText(final);
 
-  fetch("http://127.0.0.1:5000/schedule", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  })
-  .then(r=>r.json())
-  .then(data=>{
-    if (data.status !== "success") throw new Error(data.message || "Scheduling failed");
-    // apply backend coloring to cy nodes (if graph present)
-    if (!cy) drawGraph();
-    const scheduled = data.scheduled_exams || {};
-    // scheduled contains exam -> slot label (like "Day 1 – Morning"), backend maps colors to slot_labels internally.
-    // We'll color nodes by grouping identical slot labels to the same color.
-    const slotMap = {};
-    let nextColor = 1;
-    Object.keys(scheduled).forEach(exam => {
-      const slot = scheduled[exam];
-      if (!slotMap[slot]) {
-        slotMap[slot] = nextColor++;
-      }
-    });
-    // assign color numbers
-    Object.keys(scheduled).forEach(exam=>{
-      const slot = scheduled[exam];
-      const cnum = slotMap[slot];
-      assignColorToNode(exam, cnum);
-    });
-    updateScheduleText();
-  })
-  .catch(err=>{
-    console.error(err);
-    alert("Error generating schedule: " + (err.message || ""));
-  })
-  .finally(()=>{
-    $("scheduleBtn").disabled = false;
-    $("spinner").classList.add("hidden");
+  if (!cy) drawGraph();
+  Object.keys(final).forEach(exam => {
+    const c = final[exam];
+    if (c) assignColorToNode(exam, c);
   });
-}
-
-/* ---------- Export / clipboard (simple implementations) ---------- */
-function downloadScheduleCSV() {
-  const txt = $("scheduleText").textContent;
-  if (!txt) return alert("No schedule to download.");
-  const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'schedule.txt';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function copyScheduleToClipboard() {
-  const txt = $("scheduleText").textContent;
-  if (!txt) return alert("No schedule to copy.");
-  navigator.clipboard.writeText(txt).then(()=> alert("Copied schedule to clipboard"));
 }
