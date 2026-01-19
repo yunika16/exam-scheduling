@@ -5,13 +5,12 @@
   <title>Exam Scheduling — DSATUR (Graph Visualizer)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
 </head>
 <body>
   <header>
     <h1>Exam Scheduling — DSATUR Visualization</h1>
-    
+  </header>
 
   <main class="grid">
     <section class="panel" id="controls">
@@ -46,11 +45,9 @@
       </div>
 
       <div style="margin-top:12px;">
-        <button id="scheduleBtn" class="btn">Generate Backend Schedule</button>
-        <div id="spinner" class="spinner hidden" aria-hidden="true"></div>
+        <button id="scheduleBtn" class="btn">Generate Schedule (Local DSATUR)</button>
       </div>
 
-     
     </section>
 
     <section class="panel" id="visual">
@@ -58,15 +55,12 @@
 
       <div id="cy" class="cytoscape-container"></div>
 
-      
       <div id="scheduleContainer" class="schedule-container" style="margin-top:10px;">
         <strong>Current Step:</strong> <span id="currentStep">idle</span>
         <div id="scheduleText" class="schedule-text" style="margin-top:8px"></div>
       </div>
     </section>
   </main>
-
-
 
   <script src="script.js"></script>
 </body>
