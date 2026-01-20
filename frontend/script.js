@@ -9,11 +9,9 @@ const COLOR_PALETTE = [
   "#0EA5A4","#84CC16","#7C3AED","#FB7185","#2563EB","#D97706","#DC2626","#059669","#9333EA","#F43F5E",
   "#3B82F6","#FBBF24","#22C55E","#C026D3","#E11D48","#14B8A6","#65A30D","#BE185D","#1D4ED8","#FACC15",
   "#16A34A","#7E22CE","#9D174D","#0D9488","#4D7C0F","#DB2777","#1E40AF","#CA8A04","#15803D","#6D28D9",
-  "#9F1239","#0F766E","#3F6212","#E879F9","#312E81","#B45309","#166534","#C4B5FD","#881337","#115E59",
-  "#365314","#F0ABFC","#1E3A8A","#713F12","#14532D","#A78BFA","#F87171","#FCD34D","#34D399","#C084FC",
-  "#FDA4AF","#38BDF8","#FDE68A","#4ADE80","#D8B4FE","#FBCFE8","#60A5FA","#FEF3C7","#86EFAC","#E9D5FF",
-  "#F5D0FE","#93C5FD","#FFEDD5","#BBF7D0","#DDD6FE","#FCE7F3","#BFDBFE","#FED7AA","#A7F3D0","#E0E7FF",
-  "#F9A8D4","#C7D2FE","#FDBA74","#99F6E4","#E5E7EB","#F472B6","#818CF8","#F59E0B","#22D3EE","#D1D5DB",
+  "#9F1239","#0F766E","#365314","#F0ABFC","#1E3A8A","#713F12","#14532D","#A78BFA","#881337","#115E59",
+  "#3F6212","#DDD6FE","#FCE7F3","#BFDBFE","#FED7AA","#BBF7D0","#E9D5FF","#FBCFE8","#60A5FA","#FEF3C7",
+  "#86EFAC","#E0E7FF","#F9A8D4","#C7D2FE","#FDBA74","#99F6E4","#E5E7EB","#F472B6","#818CF8","#F59E0B",
   "#E11D48","#6366F1","#B91C1C","#F97316","#0EA5E9","#9CA3AF","#BE123C","#4338CA","#DC2626","#EA580C"
 ];
 
@@ -352,22 +350,32 @@ function assignColorToNode(id, colorNum) {
 
 /* ---------- Schedule output ---------- */
 function updateScheduleText(colorMap) {
-  const mapping = {};
+  const slotGroups = {};
   if (colorMap && typeof colorMap === 'object') {
     Object.keys(colorMap).forEach(k => {
       const c = colorMap[k];
-      if (c > 0) mapping[k] = `Slot-${c}`;
+      if (c > 0) {
+        if (!slotGroups[c]) slotGroups[c] = [];
+        slotGroups[c].push(k);
+      }
     });
   } else if (cy) {
     cy.nodes().forEach(n => {
       const slot = n.data('slot');
-      if (slot) mapping[n.id()] = slot;
+      if (slot) {
+        const slotNum = parseInt(slot.replace('Slot-', ''));
+        if (!slotGroups[slotNum]) slotGroups[slotNum] = [];
+        slotGroups[slotNum].push(n.id());
+      }
     });
   }
 
-  const keys = Object.keys(mapping).sort((a,b)=>a.localeCompare(b));
+  const sortedSlots = Object.keys(slotGroups).sort((a,b) => parseInt(a) - parseInt(b));
   let text = "";
-  keys.forEach(k=> text += `${k} → ${mapping[k]}\n`);
+  sortedSlots.forEach(slot => {
+    const subjects = slotGroups[slot].sort((a,b) => a.localeCompare(b));
+    text += `Slot ${slot}: ${subjects.join(', ')}\n`;
+  });
   $("scheduleText").textContent = text;
 }
 
@@ -383,7 +391,7 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 /* ---------- LOCAL DSATUR scheduling ---------- */
 function scheduleLocal() {
-  if (exams.length === 0) return alert("Add at least one exam.");
+  if (exams.length === 0) return alert("Add exams first.");
 
   const graph = buildGraphFromLocal();
   const steps = dsaturSteps(graph);
