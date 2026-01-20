@@ -13,54 +13,87 @@
     <p class="lead">Schedule exams with conflict resolution using graph coloring.</p>
   </header>
 
-  <div class="grid">
-    <div class="panel">
-      <div>
-        <label class="label">Add Exams</label>
-        <div class="tags" id="examTags">
-          <input type="text" id="examInput" placeholder="Type exam name and press Enter or comma">
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Navigation</h2>
+      <ul class="nav">
+        <li class="nav-item active" data-tab="input">Input</li>
+        <li class="nav-item" data-tab="conflicts">Conflicts</li>
+        <li class="nav-item" data-tab="graph">Graph</li>
+        <li class="nav-item" data-tab="result">Result</li>
+      </ul>
+    </aside>
+
+    <main class="content">
+      <!-- Input Tab -->
+      <section class="tab active" id="input">
+        <div class="panel">
+          <h3>Upload CSV + Setup</h3>
+
+          <label class="label">Upload CSV</label>
+          <input type="file" id="csvFile" accept=".csv">
+          <button id="uploadBtn" class="btn primary">Upload CSV</button>
+          <p id="uploadStatus" class="small muted"></p>
+
+          <hr>
+
+          <label class="label">Start Date</label>
+          <input type="date" id="startDate">
+
+          <label class="label">Gap Between Exams (days)</label>
+          <input type="number" id="gapDays" value="2">
+
+          <label class="label">Add Holidays</label>
+          <input type="date" id="holidayDate">
+          <button id="addHolidayBtn" class="btn">Add Holiday</button>
+
+          <ul id="holidayList" class="list"></ul>
+
+          <button id="proceedBtn" class="btn primary">Proceed</button>
         </div>
-      </div>
+      </section>
 
-      <div style="margin-top:16px">
-        <label class="label">Add Conflicts</label>
-        <div class="conflict-editor">
-          <select id="conflictA"></select>
-          <select id="conflictB"></select>
-          <button id="addConflictBtn" class="btn primary">Add Conflict</button>
+      <!-- Conflicts Tab -->
+      <section class="tab" id="conflicts">
+        <div class="panel">
+          <h3>Conflicts</h3>
+          <ul id="conflictList" class="list"></ul>
         </div>
-        <ul id="conflictList" class="list"></ul>
-      </div>
+      </section>
 
-      <div style="margin-top:16px">
-        <label class="label">Upload CSV</label>
-        <input type="file" id="csvFile" accept=".csv">
-        <button id="uploadBtn" class="btn">Upload</button>
-        <span id="uploadStatus" class="small muted"></span>
-      </div>
+      <!-- Graph Tab -->
+      <section class="tab" id="graph">
+        <div class="panel">
+          <h3>Graph</h3>
+          <div class="cytoscape-container" id="cy"></div>
 
-      <div class="actions" style="margin-top:16px">
-        <button id="drawGraphBtn" class="btn">Draw Graph</button>
-        <button id="animateBtn" class="btn primary">Animate Scheduling</button>
-        <button id="stopAnimBtn" class="btn" disabled>Stop</button>
-        <button id="scheduleBtn" class="btn">Schedule</button>
-      </div>
+          <div class="actions">
+            <button id="animateBtn" class="btn primary">Animate DSATUR</button>
+            <button id="clearColorBtn" class="btn">Clear Color</button>
+          </div>
+        </div>
+      </section>
 
-      <div style="margin-top:16px">
-        <span id="currentStep" class="small muted"></span>
-      </div>
-    </div>
+      <!-- Result Tab -->
+      <section class="tab" id="result">
+        <div class="panel">
+          <h3>Final Schedule</h3>
+          <p id="optimization" class="small muted"></p>
+          <pre id="scheduleText" class="schedule-text"></pre>
 
-    <div>
-      <div class="panel">
-        <div class="cytoscape-container" id="cy"></div>
-      </div>
-
-      <div class="panel schedule-container">
-        <h3>Scheduled Exams</h3>
-        <pre id="scheduleText"></pre>
-      </div>
-    </div>
+          <h3>Schedule Table</h3>
+          <table id="scheduleTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Subjects</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script src="script.js"></script>
