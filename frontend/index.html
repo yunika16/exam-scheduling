@@ -1,66 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Exam Scheduling — DSATUR (Graph Visualizer)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exam Scheduler</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>Exam Scheduling — DSATUR Visualization</h1>
+    <h1>Exam Scheduler</h1>
+    <p class="lead">Schedule exams with conflict resolution using graph coloring.</p>
   </header>
 
-  <main class="grid">
-    <section class="panel" id="controls">
-      <h2>Inputs</h2>
-
-      <label class="label">Upload Enrollment CSV (student_id,course)</label>
-      <div class="row">
-        <input type="file" id="csvFile" accept=".csv" />
-        <button id="uploadBtn" class="btn">Upload & Auto-Fill</button>
-      </div>
-      <div id="uploadStatus" class="muted small"></div>
-
-      <hr/>
-
-      <label class="label">Exams</label>
-      <div id="examTags" class="tags" tabindex="0">
-        <input id="examInput" placeholder="Type exam name and press Enter or comma" />
+  <div class="grid">
+    <div class="panel">
+      <div>
+        <label class="label">Add Exams</label>
+        <div class="tags" id="examTags">
+          <input type="text" id="examInput" placeholder="Type exam name and press Enter or comma">
+        </div>
       </div>
 
-      <label class="label" style="margin-top:12px;">Conflicts</label>
-      <div id="conflictEditor" class="conflict-editor">
-        <select id="conflictA"></select>
-        <select id="conflictB"></select>
-        <button id="addConflictBtn" class="btn small">Add Conflict</button>
+      <div style="margin-top:16px">
+        <label class="label">Add Conflicts</label>
+        <div class="conflict-editor">
+          <select id="conflictA"></select>
+          <select id="conflictB"></select>
+          <button id="addConflictBtn" class="btn primary">Add Conflict</button>
+        </div>
+        <ul id="conflictList" class="list"></ul>
       </div>
-      <ul id="conflictList" class="list muted small"></ul>
 
-      <div class="row" style="margin-top:14px;">
+      <div style="margin-top:16px">
+        <label class="label">Upload CSV</label>
+        <input type="file" id="csvFile" accept=".csv">
+        <button id="uploadBtn" class="btn">Upload</button>
+        <span id="uploadStatus" class="small muted"></span>
+      </div>
+
+      <div class="actions" style="margin-top:16px">
         <button id="drawGraphBtn" class="btn">Draw Graph</button>
-        <button id="animateBtn" class="btn primary">Animate DSATUR</button>
+        <button id="animateBtn" class="btn primary">Animate Scheduling</button>
         <button id="stopAnimBtn" class="btn" disabled>Stop</button>
+        <button id="scheduleBtn" class="btn">Schedule</button>
       </div>
 
-      <div style="margin-top:12px;">
-        <button id="scheduleBtn" class="btn">Generate Schedule (Local DSATUR)</button>
+      <div style="margin-top:16px">
+        <span id="currentStep" class="small muted"></span>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="cytoscape-container" id="cy"></div>
       </div>
 
-    </section>
-
-    <section class="panel" id="visual">
-      <h2>Graph / Animation</h2>
-
-      <div id="cy" class="cytoscape-container"></div>
-
-      <div id="scheduleContainer" class="schedule-container" style="margin-top:10px;">
-        <strong>Current Step:</strong> <span id="currentStep">idle</span>
-        <div id="scheduleText" class="schedule-text" style="margin-top:8px"></div>
+      <div class="panel schedule-container">
+        <h3>Scheduled Exams</h3>
+        <pre id="scheduleText"></pre>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>
