@@ -1,297 +1,204 @@
 let exams = [];
 let conflicts = [];
+let holidays = [];
 let cy = null;
-let animTimer = null;
-let animIndex = 0;
-let animSteps = [];
+
 const COLOR_PALETTE = [
-  "#4F46E5","#10B981","#EF476F","#F59E0B","#06B6D4","#8B5CF6","#F97316","#0891B2","#A3E635","#EC4899",
-  "#0EA5A4","#84CC16","#7C3AED","#FB7185","#2563EB","#D97706","#DC2626","#059669","#9333EA","#F43F5E",
-  "#3B82F6","#FBBF24","#22C55E","#C026D3","#E11D48","#14B8A6","#65A30D","#BE185D","#1D4ED8","#FACC15",
-  "#16A34A","#7E22CE","#9D174D","#0D9488","#4D7C0F","#DB2777","#1E40AF","#CA8A04","#15803D","#6D28D9",
-  "#9F1239","#0F766E","#365314","#F0ABFC","#1E3A8A","#713F12","#14532D","#A78BFA","#881337","#115E59",
-  "#3F6212","#DDD6FE","#FCE7F3","#BFDBFE","#FED7AA","#BBF7D0","#E9D5FF","#FBCFE8","#60A5FA","#FEF3C7",
-  "#86EFAC","#E0E7FF","#F9A8D4","#C7D2FE","#FDBA74","#99F6E4","#E5E7EB","#F472B6","#818CF8","#F59E0B",
-  "#E11D48","#6366F1","#B91C1C","#F97316","#0EA5E9","#9CA3AF","#BE123C","#4338CA","#DC2626","#EA580C"
+  "#4F46E5","#10B981","#EF476F","#F59E0B","#06B6D4","#8B5CF6",
+  "#F97316","#0891B2","#A3E635","#EC4899","#0EA5A4","#84CC16",
+  "#7C3AED","#FB7185","#2563EB","#D97706","#DC2626","#059669",
+  "#9333EA","#F43F5E","#3B82F6","#FBBF24","#22C55E","#C026D3",
+  "#E11D48","#14B8A6","#65A30D","#BE185D","#1D4ED8","#FACC15"
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
-  initElements();
-  renderExamTags();
-  renderConflictSelectors();
+  initNavigation();
+  initButtons();
 });
 
-function $(id) { return document.getElementById(id); }
+function $(id){ return document.getElementById(id); }
 
-function initElements() {
-  const examInput = $("examInput");
-  examInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      const text = examInput.value.trim().replace(/,$/, "");
-      if (text) addExam(text);
-      examInput.value = "";
-    } else if (e.key === "Backspace" && examInput.value === "") {
-      exams.pop();
-      renderExamTags();
-      renderConflictSelectors();
-    }
-  });
-
-  $("uploadBtn").addEventListener("click", uploadCSV);
-  $("addConflictBtn").addEventListener("click", () => {
-    const a = $("conflictA").value;
-    const b = $("conflictB").value;
-    if (!a || !b || a === b) return alert("Choose two different exams.");
-    addConflict(a, b);
-  });
-
-  $("drawGraphBtn").addEventListener("click", () => {
-    if (exams.length === 0) return alert("Add exams first.");
-    drawGraph();
-  });
-
-  $("animateBtn").addEventListener("click", async () => {
-    if (!cy) {
-      if (exams.length === 0) return alert("Add exams first.");
-      drawGraph();
-    }
-    const graph = buildGraphFromLocal();
-    animSteps = dsaturSteps(graph);
-    if (animSteps.length === 0) return alert("No steps to animate.");
-    $("animateBtn").disabled = true;
-    $("stopAnimBtn").disabled = false;
-    animIndex = 0;
-    await runAnimation(animSteps);
-  });
-
-  $("stopAnimBtn").addEventListener("click", stopAnimation);
-
-  // IMPORTANT: LOCAL DSATUR scheduling
-  $("scheduleBtn").addEventListener("click", scheduleLocal);
-}
-
-/* ---------- Exams (tags) ---------- */
-function addExam(name) {
-  name = String(name).trim();
-  if (!name) return;
-  if (!exams.includes(name)) {
-    exams.push(name);
-    exams.sort((a,b) => a.localeCompare(b));
-    renderExamTags();
-    renderConflictSelectors();
-  }
-}
-
-function removeExam(name) {
-  exams = exams.filter(e => e !== name);
-  conflicts = conflicts.filter(([a,b]) => a !== name && b !== name);
-  renderExamTags();
-  renderConflictSelectors();
-  renderConflictList();
-}
-
-function renderExamTags() {
-  const container = $("examTags");
-  container.querySelectorAll(".tag").forEach(n => n.remove());
-  const input = $("examInput");
-  exams.forEach(name => {
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = name;
-    tag.title = "Click to remove";
-    tag.addEventListener("click", () => {
-      if (confirm(`Remove exam "${name}"?`)) removeExam(name);
+/* ---------- Navigation ---------- */
+function initNavigation(){
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      item.classList.add("active");
+      $(item.dataset.tab).classList.add("active");
     });
-    container.insertBefore(tag, input);
   });
 }
 
-/* ---------- Conflicts editor ---------- */
-function renderConflictSelectors() {
-  const a = $("conflictA");
-  const b = $("conflictB");
-  a.innerHTML = `<option value="">-- Exam A --</option>`;
-  b.innerHTML = `<option value="">-- Exam B --</option>`;
-  exams.forEach(name => {
-    const opt1 = document.createElement("option");
-    opt1.value = name;
-    opt1.textContent = name;
-    a.appendChild(opt1);
-    const opt2 = opt1.cloneNode(true);
-    b.appendChild(opt2);
-  });
-  renderConflictList();
+/* ---------- Buttons ---------- */
+function initButtons(){
+  $("uploadBtn").addEventListener("click", uploadCSV);
+  $("addHolidayBtn").addEventListener("click", addHoliday);
+  $("proceedBtn").addEventListener("click", proceed);
+
+  $("animateBtn").addEventListener("click", animateDSATUR);
+  $("clearColorBtn").addEventListener("click", clearColors);
 }
 
-function addConflict(a, b) {
-  const pair = a < b ? [a,b] : [b,a];
-  if (conflicts.some(([x,y]) => x===pair[0] && y===pair[1])) {
-    alert("Conflict already exists");
-    return;
-  }
-  conflicts.push(pair);
-  renderConflictList();
+/* ---------- RESET ---------- */
+function resetAllData() {
+  exams = [];
+  conflicts = [];
+  holidays = [];
+  if (cy) cy.destroy();
+  cy = null;
+
+  $("uploadStatus").textContent = "";
+  $("conflictList").innerHTML = "";
+  $("holidayList").innerHTML = "";
+  $("scheduleText").textContent = "";
+  $("optimization").textContent = "";
+  $("scheduleTable").querySelector("tbody").innerHTML = "";
 }
 
-function removeConflict(index) {
-  conflicts.splice(index,1);
-  renderConflictList();
-}
-
-function renderConflictList() {
-  const ul = $("conflictList");
-  ul.innerHTML = "";
-  conflicts.forEach((p, idx) => {
-    const li = document.createElement("li");
-    const span = document.createElement("span");
-    span.className = "pair";
-    span.textContent = `${p[0]} — ${p[1]}`;
-    const del = document.createElement("button");
-    del.textContent = "Remove";
-    del.addEventListener("click", () => removeConflict(idx));
-    li.appendChild(span);
-    li.appendChild(del);
-    ul.appendChild(li);
-  });
-}
-
-/* ---------- CSV Upload (local parsing) ---------- */
-function uploadCSV() {
+/* ---------- CSV Upload ---------- */
+function uploadCSV(){
   const file = $("csvFile").files[0];
-  if (!file) return alert("Select a CSV file first.");
-  const status = $("uploadStatus");
-  status.textContent = "Uploading...";
+  if(!file) return alert("Select a CSV file");
+
+  resetAllData(); // RESET after file check
 
   const reader = new FileReader();
   reader.onload = () => {
-    const text = reader.result;
-    const lines = text.trim().split("\n");
+    const lines = reader.result.trim().split("\n");
     const enrollments = [];
 
     lines.forEach((line, idx) => {
-      if (idx === 0 && line.toLowerCase().includes("student")) return;
+      if(idx === 0 && line.toLowerCase().includes("student")) return;
       const parts = line.split(",");
-      if (parts.length < 2) return;
+      if(parts.length < 2) return;
       enrollments.push({ student: parts[0].trim(), course: parts[1].trim() });
     });
 
-    // build conflicts automatically
+    // ADD ALL COURSES (even if no conflicts)
+    enrollments.forEach(e => addExam(e.course));
+
     const studentMap = {};
     enrollments.forEach(e => {
-      if (!studentMap[e.student]) studentMap[e.student] = [];
+      if(!studentMap[e.student]) studentMap[e.student] = [];
       studentMap[e.student].push(e.course);
     });
 
     Object.values(studentMap).forEach(courses => {
-      for (let i=0; i<courses.length; i++) {
-        for (let j=i+1; j<courses.length; j++) {
-          addExam(courses[i]);
-          addExam(courses[j]);
+      for(let i=0; i<courses.length; i++){
+        for(let j=i+1; j<courses.length; j++){
           addConflict(courses[i], courses[j]);
         }
       }
     });
 
-    status.textContent = "Uploaded successfully.";
-    setTimeout(() => status.textContent = "", 3000);
+    $("uploadStatus").textContent = "CSV uploaded successfully!";
+    renderConflicts();
+    drawGraph();
   };
 
   reader.readAsText(file);
 }
 
-/* ---------- Build graph object from current exams/conflicts ---------- */
-function buildGraphFromLocal() {
+/* ---------- Exam & Conflict ---------- */
+function addExam(name){
+  if(!exams.includes(name)) exams.push(name);
+}
+
+function addConflict(a,b){
+  const pair = a < b ? [a,b] : [b,a];
+  if(!conflicts.some(x => x[0]==pair[0] && x[1]==pair[1])){
+    conflicts.push(pair);
+  }
+}
+
+function renderConflicts(){
+  const list = $("conflictList");
+  list.innerHTML = "";
+
+  if(conflicts.length === 0){
+    const li = document.createElement("li");
+    li.textContent = "No conflict exists.";
+    list.appendChild(li);
+    return;
+  }
+
+  conflicts.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${c[0]} — ${c[1]}`;
+    list.appendChild(li);
+  });
+}
+
+/* ---------- Holidays ---------- */
+function addHoliday(){
+  const date = $("holidayDate").value;
+  if(!date) return alert("Select a date");
+  if(!holidays.includes(date)) holidays.push(date);
+  renderHolidays();
+}
+
+function renderHolidays(){
+  const list = $("holidayList");
+  list.innerHTML = "";
+  holidays.sort().forEach((d,i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `${d} <button onclick="removeHoliday(${i})">Remove</button>`;
+    list.appendChild(li);
+  });
+}
+
+function removeHoliday(i){
+  holidays.splice(i,1);
+  renderHolidays();
+}
+
+/* ---------- DSATUR ---------- */
+function buildGraph(){
   const graph = {};
   exams.forEach(e => graph[e] = new Set());
   conflicts.forEach(([a,b]) => {
-    if (graph[a] && graph[b] && a !== b) {
-      graph[a].add(b);
-      graph[b].add(a);
-    }
+    graph[a].add(b);
+    graph[b].add(a);
   });
   return graph;
 }
 
-/* ---------- Draw graph with Cytoscape ---------- */
-function drawGraph() {
-  const elements = [];
-  exams.forEach(e => elements.push({ data: { id: e, label: e } }));
-  const seen = new Set();
-  conflicts.forEach(([a,b]) => {
-    const key = `${a}---${b}`;
-    if (!seen.has(key)) {
-      elements.push({ data: { id: key, source: a, target: b } });
-      seen.add(key);
-    }
-  });
-
-  if (cy) {
-    cy.destroy();
-    cy = null;
-  }
-
-  cy = cytoscape({
-    container: document.getElementById('cy'),
-    elements: elements,
-    style: [
-      { selector: 'node', style: { 'background-color': '#c7d2fe', 'label': 'data(label)', 'width': 38, 'height': 38, 'text-valign': 'center', 'color': '#071233', 'text-wrap': 'wrap', 'font-size': 11, 'overlay-padding': '6px' } },
-      { selector: 'edge', style: { 'width': 2, 'line-color': '#e2e8f0', 'curve-style': 'bezier' } },
-      { selector: '.chosen', style: { 'overlay-color': '#000', 'overlay-opacity': 0.08, 'border-width': 4, 'border-color': '#111827' } }
-    ],
-    layout: { name: 'cose', idealEdgeLength: 80, nodeOverlap: 12 }
-  });
-
-  resetNodeStyles();
-  updateScheduleText({});
-}
-
-/* ---------- DSATUR algorithm steps (JS): records steps for animation ---------- */
-function dsaturSteps(graph) {
+function dsaturSteps(graph){
   const vertices = Object.keys(graph);
-  const degrees = {};
+  const degree = {};
   const color = {};
-  const satColors = {};
+  const sat = {};
   const uncolored = new Set(vertices);
 
   vertices.forEach(v => {
-    degrees[v] = graph[v].size;
+    degree[v] = graph[v].size;
     color[v] = 0;
-    satColors[v] = new Set();
+    sat[v] = new Set();
   });
 
   const steps = [];
 
-  while (uncolored.size > 0) {
-    const candidates = Array.from(uncolored);
-    candidates.sort((a,b) => {
-      if (satColors[b].size !== satColors[a].size)
-        return satColors[b].size - satColors[a].size;
-      if (degrees[b] !== degrees[a])
-        return degrees[b] - degrees[a];
-      return a.localeCompare(b);
-    });
+  while(uncolored.size){
+    const chosen = [...uncolored].sort((a,b)=>{
+      if(sat[b].size != sat[a].size) return sat[b].size - sat[a].size;
+      return degree[b] - degree[a];
+    })[0];
 
-    const chosen = candidates[0];
     const used = new Set();
     graph[chosen].forEach(n => {
-      if (color[n] > 0) used.add(color[n]);
+      if(color[n]>0) used.add(color[n]);
     });
 
-    let c = 1;
-    while (used.has(c)) c++;
+    let c=1;
+    while(used.has(c)) c++;
     color[chosen] = c;
 
-    const snapshot = {
-      chosen,
-      colorAssigned: c,
-      colorMap: Object.assign({}, color)
-    };
-    steps.push(snapshot);
-
+    steps.push({ chosen, colorAssigned:c, colorMap:{...color} });
     uncolored.delete(chosen);
+
     graph[chosen].forEach(n => {
-      if (uncolored.has(n)) satColors[n].add(c);
+      if(uncolored.has(n)) sat[n].add(c);
     });
   }
 
@@ -299,108 +206,178 @@ function dsaturSteps(graph) {
 }
 
 /* ---------- Animation ---------- */
-async function runAnimation(steps, delay = 800) {
-  resetNodeStyles();
-  updateScheduleText({});
+async function animateDSATUR(){
+  if(!cy) drawGraph();
+  const steps = dsaturSteps(buildGraph());
 
-  for (let i = 0; i < steps.length; i++) {
+  for(let i=0; i<steps.length; i++){
     const s = steps[i];
-    highlightChosenNode(s.chosen);
-    updateCurrentStepText(i+1, steps.length, s);
-    await sleep(delay * 0.45);
-    assignColorToNode(s.chosen, s.colorAssigned);
-    updateScheduleText(s.colorMap);
-    await sleep(delay * 0.55);
+    highlightNode(s.chosen);
+    await sleep(600);
+    assignColor(s.chosen, s.colorAssigned);
+  }
+}
+
+function clearColors() {
+  if (!cy) return;
+
+  cy.nodes().forEach(node => {
+    node.style({
+      "background-color": "#3b82f6",
+      "border-width": 0
+    });
+    node.data("slot", "");
+  });
+
+  cy.nodes().style("border-width", 0);
+}
+
+/* ---------- Graph ---------- */
+function drawGraph(){
+  const elements = [];
+
+  exams.forEach(e => elements.push({ data:{ id:e, label:e } }));
+  conflicts.forEach(([a,b]) => elements.push({ data:{ id:`${a}-${b}`, source:a, target:b } }));
+
+  if(cy) cy.destroy();
+  cy = null;
+
+  cy = cytoscape({
+    container: document.getElementById("cy"),
+    elements,
+    style: [
+      {
+        selector: "node",
+        style: {
+          "background-color": "#3b82f6",
+          "label": "data(label)",
+          "text-valign": "center",
+          "color": "#fff",
+          "width": 60,
+          "height": 60,
+          "font-size": 12
+        }
+      },
+      {
+        selector: "edge",
+        style: {
+          "width": 2,
+          "line-color": "#94a3b8"
+        }
+      }
+    ],
+    layout: { name: "cose", idealEdgeLength: 120, nodeOverlap: 12 },
+    zoomingEnabled: true,
+    userZoomingEnabled: true,
+    fit: true
+  });
+
+  // If no edges, use grid layout
+  if (conflicts.length === 0) {
+    cy.layout({
+      name: "grid",
+      rows: Math.ceil(Math.sqrt(exams.length)),
+      cols: Math.ceil(Math.sqrt(exams.length))
+    }).run();
+  }
+}
+
+function highlightNode(id){
+  if(!cy) return;
+  cy.nodes().style("border-width",0);
+  cy.getElementById(id).style({ "border-width":4, "border-color":"#ff5c7a" });
+}
+
+function assignColor(id, num){
+  if(!cy) return;
+  cy.getElementById(id).style("background-color", COLOR_PALETTE[(num-1)%COLOR_PALETTE.length]);
+  cy.getElementById(id).data("slot", `Slot ${num}`);
+}
+
+/* ---------- Proceed & Schedule ---------- */
+function proceed(){
+  if(exams.length==0) return alert("Upload CSV first");
+  drawGraph();
+  const steps = dsaturSteps(buildGraph());
+  const final = steps[steps.length-1].colorMap;
+  displayResult(final);
+}
+
+function displayResult(colorMap){
+  let output = "";
+  const slots = {};
+
+  Object.keys(colorMap).forEach(e => {
+    const c = colorMap[e];
+    if(!slots[c]) slots[c] = [];
+    slots[c].push(e);
+  });
+
+  const start = new Date($("startDate").value);
+  if (!start || isNaN(start.getTime())) {
+    alert("Please select a valid Start Date!");
+    return;
   }
 
-  $("animateBtn").disabled = false;
-  $("stopAnimBtn").disabled = true;
-  updateCurrentStepText("finished", steps.length, null);
+  const gap = parseInt($("gapDays").value) || 2;
+
+  let current = new Date(start);
+  const slotDates = {};
+  const slotKeys = Object.keys(slots).map(Number).sort((a,b)=>a-b);
+
+  slotKeys.forEach(slot => {
+    while(holidays.includes(formatDate(current))) {
+      current.setDate(current.getDate() + 1);
+    }
+
+    slotDates[slot] = formatDate(current);
+
+    // Add gap days AFTER scheduling exam day
+    current.setDate(current.getDate() + gap + 1);
+  });
+
+  slotKeys.forEach(slot => {
+    output += `Slot ${slot} (${slotDates[slot]}): ${slots[slot].join(", ")}\n`;
+  });
+
+  $("scheduleText").textContent = output;
+  renderScheduleTable(slotDates, slots);
+
+  const optimized = Math.round((1 - (slotKeys.length / exams.length)) * 100);
+  $("optimization").textContent = `Schedule optimized by: ${optimized}%`;
 }
 
-function stopAnimation() {
-  animTimer = "stopRequested";
-  $("animateBtn").disabled = false;
-  $("stopAnimBtn").disabled = true;
-}
+function renderScheduleTable(dates, slots){
+  const tbody = $("scheduleTable").querySelector("tbody");
+  tbody.innerHTML = "";
 
-/* ---------- Node styling ---------- */
-function resetNodeStyles() {
-  if (!cy) return;
-  cy.nodes().forEach(n => {
-    n.style({ 'background-color': '#c7d2fe', 'border-width': 0, 'border-color': '' });
-    n.removeClass('chosen');
+  const rows = Object.keys(dates).map(slot => ({
+    date: dates[slot],
+    subjects: slots[slot].join(", ")
+  }));
+
+  rows.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    const tdDate = document.createElement("td");
+    const tdSubjects = document.createElement("td");
+
+    tdDate.textContent = row.date;
+    tdSubjects.textContent = row.subjects;
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdSubjects);
+    tbody.appendChild(tr);
   });
 }
 
-function highlightChosenNode(id) {
-  if (!cy) return;
-  resetNodeStyles();
-  const node = cy.getElementById(id);
-  node.addClass('chosen');
+/* ---------- Helpers ---------- */
+function formatDate(d){
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-function assignColorToNode(id, colorNum) {
-  if (!cy) return;
-  const node = cy.getElementById(id);
-  const col = colorFor(colorNum);
-  node.style({ 'background-color': col, 'color': '#fff' });
-  node.data('slot', `Slot-${colorNum}`);
-}
-
-/* ---------- Schedule output ---------- */
-function updateScheduleText(colorMap) {
-  const slotGroups = {};
-  if (colorMap && typeof colorMap === 'object') {
-    Object.keys(colorMap).forEach(k => {
-      const c = colorMap[k];
-      if (c > 0) {
-        if (!slotGroups[c]) slotGroups[c] = [];
-        slotGroups[c].push(k);
-      }
-    });
-  } else if (cy) {
-    cy.nodes().forEach(n => {
-      const slot = n.data('slot');
-      if (slot) {
-        const slotNum = parseInt(slot.replace('Slot-', ''));
-        if (!slotGroups[slotNum]) slotGroups[slotNum] = [];
-        slotGroups[slotNum].push(n.id());
-      }
-    });
-  }
-
-  const sortedSlots = Object.keys(slotGroups).sort((a,b) => parseInt(a) - parseInt(b));
-  let text = "";
-  sortedSlots.forEach(slot => {
-    const subjects = slotGroups[slot].sort((a,b) => a.localeCompare(b));
-    text += `Slot ${slot}: ${subjects.join(', ')}\n`;
-  });
-  $("scheduleText").textContent = text;
-}
-
-function updateCurrentStepText(step, total, stepObj) {
-  if (step === "finished") $("currentStep").textContent = `finished`;
-  else $("currentStep").textContent = `Step ${step} / ${total}` + (stepObj ? ` — ${stepObj.chosen} → Slot-${stepObj.colorAssigned}` : '');
-}
-
-function colorFor(n) {
-  return COLOR_PALETTE[(n - 1) % COLOR_PALETTE.length] || '#444';
-}
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-/* ---------- LOCAL DSATUR scheduling ---------- */
-function scheduleLocal() {
-  if (exams.length === 0) return alert("Add exams first.");
-
-  const graph = buildGraphFromLocal();
-  const steps = dsaturSteps(graph);
-  const final = steps[steps.length - 1]?.colorMap || {};
-  updateScheduleText(final);
-
-  if (!cy) drawGraph();
-  Object.keys(final).forEach(exam => {
-    const c = final[exam];
-    if (c) assignColorToNode(exam, c);
-  });
-}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
